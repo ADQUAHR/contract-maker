@@ -1,3 +1,10 @@
+Python
+import io
+import pandas as pd
+import streamlit as st
+import requests  # 👈 [추가] API 통신용 라이브러리
+from docxtpl import DocxTemplate
+
 import streamlit as st
 from docxtpl import DocxTemplate
 from datetime import datetime
@@ -126,6 +133,37 @@ if st.session_state.step == 1:
             st.session_state.generated_doc = None
             st.rerun()
 
+# --- [아마란스 10 ERP 거래처 조회 함수] ---
+def fetch_amaranth_company(company_keyword):
+    # ★ 실제 사용 중인 아마란스 10 도메인 주소로 변경해 주세요
+    BASE_URL = "https://gw.fsn.co.kr/" 
+    API_PATH = "/apiproxy/api16S08"  # 회사등록조회 API
+    
+    headers = {
+        "AccessToken": "rBTUrWZA4klwucYIrVoyqlb9dzC37z",
+        "HashKey": "80338340471996318389875569045954485561741835",
+        "Content-Type": "application/json; charset=utf-8"
+    }
+    
+    # API 요청 파라미터 (검색어)
+    params = {
+        "CO_NM": company_keyword
+    }
+    
+    try:
+        response = requests.get(BASE_URL + API_PATH, headers=headers, params=params, timeout=5)
+        if response.status_code == 200:
+            res_data = response.json()
+            # API 응답 구조에 맞춰 데이터 추출 (ERP 반환 형식에 맞게 리턴)
+            return res_data
+        else:
+            st.error(f"⚠️ ERP 통신 실패 (상태코드: {response.status_code})")
+            return None
+    except Exception as e:
+        st.error(f"⚠️ API 연결 오류: {e}")
+        return None
+
+
 # ---------------------------------------------------------
 # [STEP 2] 정보 입력 페이지
 # ---------------------------------------------------------
@@ -232,19 +270,50 @@ elif st.session_state.step == 2:
         st.divider()
     
     st.subheader("🏢 상대방 및 계좌 정보")
-    c1, c2 = st.columns(2)
-    with c1:
-        partner_name = st.text_input(l_name)
-        partner_address = st.text_input(l_addr)
-        partner_info = st.text_input(l_info)
-    with c2:
-        bank = st.text_input("은행명")
-        bank_account = st.text_input("계좌번호")
-        # [수정 완료] help 인자를 text_input 내부 파라미터로 올바르게 포함
-        account_holder = st.text_input(
-            "예금주", 
-            help="대금 지급 오류 방지를 위해 반드시 계약자 명의와 일치하는지 확인해주세요."
-        )
+if st.session_state.contract_party == "individual":
+        l_name, l_info, l_addr = "계약자 이름", "생년월일 (예: 1990.01.01)", "계약자 주소"
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            partner_name = st.text_input(l_name)
+            partner_info = st.text_input(l_info)
+            partner_address = st.text_input(l_addr)
+        with col4:
+            bank = st.text_input("지급 은행")
+            bank_account = st.text_input("계좌번호")
+            account_holder = st.text_input("예금주")
+
+    else:
+        # 🏢 법인/사업자 - 아마란스 10 API 연동 구역
+        l_name, l_info, l_addr = "수급사업자 회사명", "대표이사 성함", "수급사업자 주소"
+        
+        # ERP 조회 검색창 & 버튼
+        search_col1, search_col2 = st.columns([3, 1])
+        with search_col1:
+            search_keyword = st.text_input("🔍 ERP 거래처 검색 (회사명)", placeholder="예: 더존비즈온")
+        with search_col2:
+            st.write("") # 버튼 위치 맞춤용 공백
+            st.write("") 
+            btn_search = st.button("ERP 정보 가져오기", use_container_width=True)
+            
+        # 검색 버튼 클릭 처리
+        if btn_search and search_keyword:
+            with st.spinner("Amaranth 10 ERP에서 거래처 정보를 조회하는 중..."):
+                erp_result = fetch_amaranth_company(search_keyword)
+                if erp_result:
+                    st.success("✅ ERP에서 정보를 가져왔습니다.")
+                    # TODO: erp_result의 실제 키값(예: 'CO_NM', 'CEO_NM', 'ADDR')에 맞춰 세션에 저장
+                    # st.session_state['erp_partner_name'] = erp_result.get('CO_NM', search_keyword)
+
+        col3, col4 = st.columns(2)
+        with col3:
+            partner_name = st.text_input(l_name, key="partner_name_input")
+            partner_info = st.text_input(l_info, key="partner_info_input")
+            partner_address = st.text_input(l_addr, key="partner_addr_input")
+        with col4:
+            bank = st.text_input("지급 은행")
+            bank_account = st.text_input("계좌번호")
+            account_holder = st.text_input("예금주")
 
     # --- [D. 요약 테이블] ---
     st.divider()
