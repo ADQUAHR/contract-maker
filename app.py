@@ -167,9 +167,9 @@ def fetch_amaranth_company(company_keyword):
 # ---------------------------------------------------------
 # [STEP 2] 정보 입력 페이지
 # ---------------------------------------------------------
-elif st.session_state.step == 2:
-    party_label = "개인" if st.session_state.contract_party == "individual" else "법인/사업자"
-    st.write(f"### ✍️ 2단계. [{party_label}] 정보 입력")
+    elif st.session_state.step == 2:
+       party_label = "개인" if st.session_state.contract_party == "individual" else "법인/사업자"
+       st.write(f"### ✍️ 2단계. [{party_label}] 정보 입력")
     
     if st.button("⬅️ 이전 단계로"):
         st.session_state.step = 1
